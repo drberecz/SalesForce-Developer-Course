@@ -1,0 +1,20 @@
+trigger PlayerTrigger on Player__c (before insert,after insert, before update, after update) {
+
+    if(trigger.isBefore){
+    	if(trigger.isInsert){
+    		PlayerTriggerHandler.handleBeforeInsert(trigger.new);
+    	}
+        else if(trigger.isUpdate){
+            Map<Id,Player__c> triggeroldMap = trigger.oldMap;
+        PlayerTriggerHandler.handleBeforeUpdate(triggeroldMap, trigger.new);
+        }
+    }
+
+    else if(trigger.isInsert){
+        PlayerTriggerHandler.handleRefreshTeamList(trigger.newMap, trigger.OldMap, OperationType.TRIGGER_INSERT_AFTER);
+    }
+    else{
+        PlayerTriggerHandler.handleRefreshTeamList(trigger.newMap, trigger.OldMap, OperationType.TRIGGER_UPDATE_AFTER);
+    }
+
+}

@@ -1,0 +1,107 @@
+public class PlayerTriggerHandler {
+
+    private static String SEPARATOR_CHAR = '|';
+
+    public static void handleBeforeInsert(List<Player__c> playerList){
+
+        for(Player__c p: playerList){
+            if(p.isActive__c){
+                p.activation_Date__c = System.today();
+            }
+        }
+    }
+
+
+      public static void handleBeforeUpdate(Map<Id, Player__c> triggeroldMap, List<Player__c> playerList){
+
+        for(Player__c p: playerList){
+            if(triggeroldMap.get(p.Id).isActive__c == true && p.isActive__c == false){
+                p.activation_Date__c = null;
+            }else if(triggeroldMap.get(p.Id).isActive__c == false && p.isActive__c == true)
+                {
+                p.activation_Date__c = System.today();
+                }
+
+    	}
+
+
+	}
+
+    public static void handleRefreshTeamList(Map<Id, Player__c> playerMap, Map<Id, Player__c> playerMapOld, OperationType opType){
+
+        Map<Id,List<Player__c>> playersMapByTeamRef = generatePlayersMapByTeamID(playerMap);
+		List<Team__c> TeamList = [SELECT Active_Players__c FROM Team__c WHERE Id IN :playersMapByTeamRef.keySet()];
+
+        for(Team__c team : TeamList){
+
+            List<Player__c> playerList = playersMapByTeamRef.get(team.Id);
+			ReplaceNamesFieldNullValueWithEmptyString(team);
+
+            for(Player__c player : playerList){
+            	Boolean flag;
+                if(opType == OperationType.TRIGGER_INSERT_AFTER){
+                    flag = true;
+                }else{
+                    flag = isActivityStatusChanged(player.id, playerMap, playerMapOld);
+                }
+
+            	if(flag && player.isActive__c){
+                	team.Active_Players__c += addNamePlusSeparatorChar(player.name);
+            	}else if(flag && team.Active_Players__c.contains(player.Name)){
+                	team.Active_Players__c = RemoveNameAndSeparatorChar(team.Active_Players__c, player.Name);
+            	}
+            }
+        }
+        update teamList;
+    }
+
+
+    private static Map<Id,List<Player__c>> generatePlayersMapByTeamID(Map<Id, Player__c> playerMap){
+
+        Map<Id,List<Player__c>> playersMapByTeamRef = new Map<Id,List<Player__c>>();
+
+        for(Id key: playerMap.keySet()){
+            Player__c player = playerMap.get(key);
+            Id teamId = player.Team__c;
+            List<Player__c> tempList;
+
+            if (playersMapByTeamRef.containsKey(teamId)){
+            	tempList = playersMapByTeamRef.get(teamId);
+            }else{
+            	tempList = new List<Player__c>();
+            }
+
+            tempList.add(player);
+            playersMapByTeamRef.put(teamId,tempList);
+        }
+        return playersMapByTeamRef;
+    }
+
+    private static Boolean isActivityStatusChanged(Id pId, Map<Id, Player__c> playerMapNew, Map<Id, Player__c> playerMapOld){
+    	return (playerMapOld.get(pId).isActive__c != playerMapNew.get(pId).isActive__c);
+    }
+
+    private static String addNamePlusSeparatorChar(String name){
+        return name + SEPARATOR_CHAR;
+    }
+
+    private static String RemoveNameAndSeparatorChar(String nameList, String nameToRemove){
+        return namelist.replace(nameToRemove + SEPARATOR_CHAR, '');
+    }
+
+    private static void ReplaceNamesFieldNullValueWithEmptyString(Team__c team){
+        if(team.Active_Players__c ==null){
+            team.Active_Players__c ='';
+        }
+    }
+
+
+}
+
+
+
+
+
+
+
+

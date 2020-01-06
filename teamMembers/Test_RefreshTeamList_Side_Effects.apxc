@@ -1,0 +1,261 @@
+@isTest
+public class Test_RefreshTeamList_Side_Effects {
+
+    private static final String SANYI_CONST = 'Sanyi';
+    private static final String DRGENYA_CONST = 'dr. Genya';
+    private static final String BELA_CONST = 'Bela';
+    private static final String PANDA_CONST = 'Panda';
+    private static final String TEAM_NAME_ALBATROSS = 'Albatross';
+    private static final String TEAM_NAME_ZETOR = 'Zetor';
+
+	@isTest
+    static void Should_Not_Have_Side_Effect_When_Inserting_Single_Inactive_Player(){
+
+        Team__c team = new Team__c(Name = TEAM_NAME_ALBATROSS);
+        insert team;
+		Player__c p = createPlayer(SANYI_CONST, OperationType.SET_PLAYER_AS_INACTIVE, team.Id);
+		insert p;
+
+        Team__c teamAfter = [SELECT Id,Name,Active_Players__c FROM Team__c WHERE Name=:TEAM_NAME_ALBATROSS LIMIT 1];
+        System.assertEquals(null,teamAfter.Active_Players__c);
+
+    }
+
+	@isTest
+    static void Insertion_Of_Single_Active_Player_Into_TeamListString(){
+
+        Team__c team = new Team__c(Name = TEAM_NAME_ALBATROSS);
+        insert team;
+		Player__c p = createPlayer(SANYI_CONST, OperationType.SET_PLAYER_AS_ACTIVE, team.Id);
+		insert p;
+        String expected = SANYI_CONST + '|';
+
+        Team__c teamAfter = [SELECT Id,Name,Active_Players__c FROM Team__c WHERE Name=:TEAM_NAME_ALBATROSS LIMIT 1];
+        System.assertEquals(expected,teamAfter.Active_Players__c);
+    }
+
+	@isTest
+    static void ShouldNotAlterTeamList_When_Input_Contains_InactivePlayers_only(){
+
+
+        Team__c team = new Team__c(Name = TEAM_NAME_ALBATROSS);
+        insert team;
+
+
+        List<Player__c> players= createListOf3Players(OperationType.SET_PLAYER_AS_INACTIVE, team.Id);
+        insert players;
+
+        String activeMembers = [SELECT Id,Name,Active_Players__c FROM Team__c WHERE Name=:TEAM_NAME_ALBATROSS LIMIT 1].Active_Players__c;
+        System.assertEquals(null, activeMembers);
+    }
+
+
+	@isTest
+    static void Should_Concat_All_Names_When_Input_Contains_ActivePlayers_Only(){
+
+        Team__c team = new Team__c(Name = TEAM_NAME_ALBATROSS, Active_Players__c = '');
+        insert team;
+
+        List<Player__c> players= createListOf3Players(OperationType.SET_PLAYER_AS_ACTIVE, team.Id);
+        insert players;
+
+        String expected = createExpectedStringActivePlayersList(players);
+
+        Team__c teamAfter = [SELECT Id,Name,Active_Players__c FROM Team__c LIMIT 1];
+        System.assertEquals(expected, teamAfter.Active_Players__c);
+    }
+
+	@isTest
+    static void Should_Drop_Name_From_Teamlist_When_Player_is_Set_Inactive(){
+
+        Team__c team = new Team__c(Name = TEAM_NAME_ALBATROSS, Active_Players__c = '');
+        insert team;
+
+        List<Player__c> players= createListOf3Players(OperationType.SET_PLAYER_AS_ACTIVE, team.Id);
+        insert players;
+
+        players.get(1).isActive__c = false;
+        update players;
+
+        String expected = createExpectedStringActivePlayersList(players);
+        expected = expected.replace(players.get(1).name+'|', '');
+
+        Team__c teamAfter = [SELECT Id,Name,Active_Players__c FROM Team__c LIMIT 1];
+        System.assertEquals(expected, teamAfter.Active_Players__c);
+    }
+
+
+	@isTest
+    static void Should_Add_All_Names_To_Teamlist_When_Players_are_Set_Active(){
+
+        Team__c team = new Team__c(Name = TEAM_NAME_ALBATROSS, Active_Players__c = '');
+        insert team;
+
+        List<Player__c> players= createListOf3Players(OperationType.SET_PLAYER_AS_INACTIVE, team.Id);
+        insert players;
+
+        for(Player__c player : players){
+        player.isActive__c = true;
+        }
+        update players;
+
+        String expected = createExpectedStringActivePlayersList(players);
+
+        Team__c teamAfter = [SELECT Id,Name,Active_Players__c FROM Team__c LIMIT 1];
+        System.assertEquals(expected, teamAfter.Active_Players__c);
+    }
+
+	@isTest
+    static void Insertion_Of_Mixed_ActiveInactive_Status_Players_Into_2_Different_Teams(){
+
+
+        Team__c team1 = new Team__c(Name = TEAM_NAME_ALBATROSS, Active_Players__c = '');
+        insert team1;
+        Team__c team2 = new Team__c(Name = TEAM_NAME_ZETOR, Active_Players__c = '');
+        insert team2;
+
+        List<Player__c> playersTeam1= createListOf3Players(OperationType.SET_PLAYER_AS_ACTIVE, team1.Id);
+        String expectedTeam1 = createExpectedStringActivePlayersList(playersTeam1);
+
+        List<Player__c> playersTeam2= createListOf3Players(OperationType.SET_PLAYER_AS_INACTIVE, team2.Id);
+        playersTeam2.addAll(playersTeam1);
+        insert playersTeam2;
+
+        Team__c team1After = [SELECT Id,Name,Active_Players__c FROM Team__c WHERE Name=:TEAM_NAME_ALBATROSS LIMIT 1];
+        Team__c team2After = [SELECT Id,Name,Active_Players__c FROM Team__c WHERE Name=:TEAM_NAME_ZETOR LIMIT 1];
+
+        System.assertEquals(expectedTeam1, team1After.Active_Players__c);
+        System.assertEquals(null, team2After.Active_Players__c);
+    }
+
+
+	@isTest
+    static void Insertion_Of_Active_Players_Into_2_Different_Teams(){
+
+
+        Team__c team1 = new Team__c(Name = TEAM_NAME_ALBATROSS, Active_Players__c = '');
+        insert team1;
+        Team__c team2 = new Team__c(Name = TEAM_NAME_ZETOR, Active_Players__c = '');
+        insert team2;
+
+        List<Player__c> playersTeam1= createListOf3Players(OperationType.SET_PLAYER_AS_ACTIVE, team1.Id);
+        String expectedTeam1 = createExpectedStringActivePlayersList(playersTeam1);
+
+        List<Player__c> playersTeam2= createListOf3Players(OperationType.SET_PLAYER_AS_ACTIVE, team2.Id);
+        String expectedTeam2 = createExpectedStringActivePlayersList(playersTeam2);
+        playersTeam2.addAll(playersTeam1);
+        insert playersTeam2;
+
+        Team__c team1After = [SELECT Id,Name,Active_Players__c FROM Team__c WHERE Name=:TEAM_NAME_ALBATROSS LIMIT 1];
+        Team__c team2After = [SELECT Id,Name,Active_Players__c FROM Team__c WHERE Name=:TEAM_NAME_ZETOR LIMIT 1];
+
+        System.assertEquals(expectedTeam1, team1After.Active_Players__c);
+        System.assertEquals(expectedTeam2, team2After.Active_Players__c);
+    }
+
+	@isTest
+    static void Use_Case_Inactive_Player_Swaps_Teams(){
+
+        Team__c team1 = new Team__c(Name = TEAM_NAME_ALBATROSS, Active_Players__c = '');
+        insert team1;
+        Team__c team2 = new Team__c(Name = TEAM_NAME_ZETOR, Active_Players__c = '');
+        insert team2;
+
+        List<Player__c> playersTeam1 = new List<Player__c>();
+        Player__c pPanda = createPlayer(PANDA_CONST, OperationType.SET_PLAYER_AS_INACTIVE, team1.id);
+        playersTeam1.add(pPanda);
+
+        List<Player__c> playersTeam2= createListOf3Players(OperationType.SET_PLAYER_AS_ACTIVE, team2.Id);
+        playersTeam2.addAll(playersTeam1);
+        insert playersTeam2;
+
+        Player__c pandaRef = [SELECT Id, Name, isActive__c, Team__c FROM Player__c WHERE Name=:PANDA_CONST LIMIT 1];
+
+        pandaRef.Team__c = team2.Id;
+
+        pandaRef.isActive__c = true;
+        update pandaRef;
+
+        List<Player__c> playersTeam2After = [SELECT Id,Name,Team__c, isActive__c FROM Player__c WHERE Team__c=:team2.Id];
+
+        String expectedTeam2 = createExpectedStringActivePlayersList(playersTeam2After);
+        Team__c team1After = [SELECT Id,Name,Active_Players__c FROM Team__c WHERE Name=:TEAM_NAME_ALBATROSS LIMIT 1];
+        Team__c team2After = [SELECT Id,Name,Active_Players__c FROM Team__c WHERE Name=:TEAM_NAME_ZETOR LIMIT 1];
+
+        System.assertEquals(null, team1After.Active_Players__c);
+        System.assertEquals(expectedTeam2, team2After.Active_Players__c);
+    }
+
+
+	@isTest
+    static void Use_Case_Active_Player_Swaps_Teams(){
+
+
+        Team__c team1 = new Team__c(Name = TEAM_NAME_ALBATROSS, Active_Players__c = '');
+        insert team1;
+        Team__c team2 = new Team__c(Name = TEAM_NAME_ZETOR, Active_Players__c = '');
+        insert team2;
+
+        List<Player__c> playersTeam2 = new List<Player__c>();
+        Player__c pPanda = createPlayer(PANDA_CONST, OperationType.SET_PLAYER_AS_ACTIVE, team2.id);
+        playersTeam2.add(pPanda);
+        playersTeam2.addAll(createListOf3Players(OperationType.SET_PLAYER_AS_ACTIVE, team2.Id));
+        insert playersTeam2;
+
+        pPanda.isActive__c = false;
+        update pPanda;
+        pPanda.Team__c = team1.Id;
+        pPanda.isActive__c = true;
+        update pPanda;
+
+        List<Player__c> playersTeam1After = [SELECT Id,Name,Team__c, isActive__c FROM Player__c WHERE Team__c=:team1.Id];
+        List<Player__c> playersTeam2After = [SELECT Id,Name,Team__c, isActive__c FROM Player__c WHERE Team__c=:team2.Id];
+
+        String expectedTeam1 = createExpectedStringActivePlayersList(playersTeam1After);
+        String expectedTeam2 = createExpectedStringActivePlayersList(playersTeam2After);
+        Team__c team1After = [SELECT Id,Name,Active_Players__c FROM Team__c WHERE Name=:TEAM_NAME_ALBATROSS LIMIT 1];
+        Team__c team2After = [SELECT Id,Name,Active_Players__c FROM Team__c WHERE Name=:TEAM_NAME_ZETOR LIMIT 1];
+
+        System.assertEquals(expectedTeam1, team1After.Active_Players__c);
+        System.assertEquals(expectedTeam2, team2After.Active_Players__c);
+    }
+
+
+    private static Player__c createPlayer(String plyrName, OperationType opType,Id teamRef){
+
+        Boolean isActive = (opType == OperationType.SET_PLAYER_AS_ACTIVE);
+        Player__c player = new Player__c(Name = plyrName, isActive__c = isActive);
+        if(teamRef!=null){
+            player.Team__c = teamRef;
+        }
+        return player;
+     }
+
+    private static List<Player__c> createListOf3Players(OperationType opType, Id teamRef){
+
+        List<Player__c> playerList = new List<Player__c>();
+        Player__c p1 = createPlayer(SANYI_CONST, opType, teamRef);
+        Player__c p2 = createPlayer(DRGENYA_CONST, opType, teamRef);
+    	Player__c p3 = createPlayer(BELA_CONST, opType, teamRef);
+        playerList.add(p1);
+        playerList.add(p2);
+        playerList.add(p3);
+
+        return playerList;
+    }
+
+    private static String createExpectedStringActivePlayersList(List<Player__c> players){
+
+        String expected = '';
+        for(Player__c player: players){
+            if(player!=null && player.isActive__c){
+        	expected += player.Name + '|';
+            }
+    	}
+		return expected;
+    }
+
+
+
+
+}
